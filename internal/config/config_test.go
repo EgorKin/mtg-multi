@@ -65,6 +65,32 @@ func (suite *ConfigTestSuite) TestMultiBindGetFirstPort() {
 	suite.Equal(uint(443), conf.GetFirstBindPort())
 }
 
+func (suite *ConfigTestSuite) TestGetFirstBindPortEmpty() {
+	conf := &config.Config{}
+	suite.Equal(uint(0), conf.GetFirstBindPort())
+}
+
+func (suite *ConfigTestSuite) TestParseEmptyBindArray() {
+	_, err := config.Parse(suite.ReadConfig("empty_bind.toml"))
+	suite.Error(err)
+}
+
+func (suite *ConfigTestSuite) TestParseInvalidBindAddr() {
+	_, err := config.Parse(suite.ReadConfig("invalid_bind_addr.toml"))
+	suite.Error(err)
+}
+
+func (suite *ConfigTestSuite) TestParseNonStringBind() {
+	_, err := config.Parse(suite.ReadConfig("non_string_bind.toml"))
+	suite.Error(err)
+}
+
+func (suite *ConfigTestSuite) TestValidateDuplicateBindAddrs() {
+	conf, err := config.Parse(suite.ReadConfig("duplicate_bind.toml"))
+	suite.NoError(err)
+	suite.Error(conf.Validate())
+}
+
 func (suite *ConfigTestSuite) TestParsePublicIP() {
 	conf, err := config.Parse(suite.ReadConfig("public_ip.toml"))
 	suite.NoError(err)

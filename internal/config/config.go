@@ -154,10 +154,19 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("incorrect bind-to parameter: no addresses specified")
 	}
 
+	seen := make(map[string]struct{}, len(c.BindTo))
+
 	for _, addr := range c.BindTo {
-		if addr.Get("") == "" {
+		v := addr.Get("")
+		if v == "" {
 			return fmt.Errorf("incorrect bind-to parameter: empty address")
 		}
+
+		if _, ok := seen[v]; ok {
+			return fmt.Errorf("duplicate bind-to address: %s", v)
+		}
+
+		seen[v] = struct{}{}
 	}
 
 	return nil

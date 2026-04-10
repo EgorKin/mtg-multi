@@ -3,6 +3,7 @@ package utils_test
 import (
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dolonet/mtg-multi/internal/utils"
@@ -55,6 +56,26 @@ func (suite *MultiListenerTestSuite) TestAcceptFromMultipleListeners() {
 	wg.Wait()
 }
 
+func (suite *MultiListenerTestSuite) TestSingleListener() {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	suite.Require().NoError(err)
+
+	ml := utils.NewMultiListener(l)
+	defer ml.Close() //nolint: errcheck
+
+	go func() {
+		conn, err := net.Dial("tcp", l.Addr().String())
+		suite.NoError(err)
+
+		conn.Close() //nolint: errcheck
+	}()
+
+	conn, err := ml.Accept()
+	suite.NoError(err)
+
+	conn.Close() //nolint: errcheck
+}
+
 func (suite *MultiListenerTestSuite) TestCloseStopsAccept() {
 	l1, err := net.Listen("tcp", "127.0.0.1:0")
 	suite.Require().NoError(err)
@@ -75,6 +96,66 @@ func (suite *MultiListenerTestSuite) TestCloseStopsAccept() {
 
 	suite.NoError(ml.Close())
 	<-done
+}
+
+func (suite *MultiListenerTestSuite) TestConcurrentAccept() {
+	const numListeners = 3
+	const connsPerListener = 10
+
+	listeners := make([]net.Listener, numListeners)
+
+	for i := range numListeners {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		suite.Require().NoError(err)
+
+		listeners[i] = l
+	}
+
+	ml := utils.NewMultiListener(listeners...)
+	defer ml.Close() //nolint: errcheck
+
+	var accepted atomic.Int32
+
+	// Accept all connections in background.
+	go func() {
+		for range numListeners * connsPerListener {
+			conn, err := ml.Accept()
+			if err != nil {
+				return
+			}
+
+			accepted.Add(1)
+
+			conn.Close() //nolint: errcheck
+		}
+	}()
+
+	// Dial every listener concurrently.
+	var wg sync.WaitGroup
+
+	for _, l := range listeners {
+		for range connsPerListener {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				conn, err := net.Dial("tcp", l.Addr().String())
+				if err != nil {
+					return
+				}
+
+				conn.Close() //nolint: errcheck
+			}()
+		}
+	}
+
+	wg.Wait()
+
+	// Give accept goroutine a moment to drain the channel.
+	suite.Eventually(func() bool {
+		return accepted.Load() == numListeners*connsPerListener
+	}, 2_000_000_000, 10_000_000) // 2s timeout, 10ms poll
 }
 
 func (suite *MultiListenerTestSuite) TestAddr() {

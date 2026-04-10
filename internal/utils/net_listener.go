@@ -51,7 +51,7 @@ type MultiListener struct {
 func NewMultiListener(listeners ...net.Listener) *MultiListener {
 	ml := &MultiListener{
 		listeners: listeners,
-		connCh:    make(chan acceptResult),
+		connCh:    make(chan acceptResult, len(listeners)),
 	}
 
 	for _, l := range listeners {
