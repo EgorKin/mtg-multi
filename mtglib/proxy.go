@@ -222,7 +222,13 @@ func (p *Proxy) doFakeTLSHandshake(ctx *streamContext) bool {
 	)
 	if err != nil {
 		p.logger.InfoError("cannot read client hello", err)
-		p.doDomainFrontingForHost(ctx, rewind, p.secrets[0].Host)
+
+		frontHost := p.secrets[0].Host
+		if result != nil && result.MatchedHost != "" {
+			frontHost = result.MatchedHost
+		}
+
+		p.doDomainFrontingForHost(ctx, rewind, frontHost)
 
 		return false
 	}
@@ -329,10 +335,6 @@ func (p *Proxy) doTelegramCall(ctx *streamContext) error {
 	)
 
 	return nil
-}
-
-func (p *Proxy) doDomainFronting(ctx *streamContext, conn *connRewind) {
-	p.doDomainFrontingForHost(ctx, conn, p.secrets[0].Host)
 }
 
 func (p *Proxy) doDomainFrontingForHost(ctx *streamContext, conn *connRewind, host string) {

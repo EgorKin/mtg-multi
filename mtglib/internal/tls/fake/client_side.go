@@ -138,7 +138,13 @@ func ReadClientHelloMulti(
 		}, nil
 	}
 
-	return nil, ErrBadDigest
+	// Return a partial result so the caller can use matchedHost for domain
+	// fronting even when no secret matched the HMAC (e.g. a DPI probe with
+	// a valid SNI but garbage payload).
+	return &ReadClientHelloResult{
+		MatchedIndex: -1,
+		MatchedHost:  matchedHost,
+	}, ErrBadDigest
 }
 
 func parseHandshake(r io.Reader) (*ClientHello, error) {
