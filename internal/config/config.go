@@ -27,7 +27,7 @@ type Config struct {
 	AllowFallbackOnUnknownDC    TypeBool                   `json:"allowFallbackOnUnknownDc"`
 	Secret                      mtglib.Secret              `json:"secret"`
 	Secrets                     map[string]mtglib.Secret   `json:"secrets"`
-	BindTo                      TypeHostPort               `json:"bindTo"`
+	BindTo                      []TypeHostPort             `json:"bindTo"`
 	ProxyProtocolListener       TypeBool        `json:"proxyProtocolListener"`
 	PreferIP                    TypePreferIP    `json:"preferIp"`
 	AutoUpdate                  TypeBool        `json:"autoUpdate"`
@@ -150,8 +150,23 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.BindTo.Get("") == "" {
-		return fmt.Errorf("incorrect bind-to parameter %s", c.BindTo.String())
+	if len(c.BindTo) == 0 {
+		return fmt.Errorf("incorrect bind-to parameter: no addresses specified")
+	}
+
+	seen := make(map[string]struct{}, len(c.BindTo))
+
+	for _, addr := range c.BindTo {
+		v := addr.Get("")
+		if v == "" {
+			return fmt.Errorf("incorrect bind-to parameter: empty address")
+		}
+
+		if _, ok := seen[v]; ok {
+			return fmt.Errorf("duplicate bind-to address: %s", v)
+		}
+
+		seen[v] = struct{}{}
 	}
 
 	return nil
@@ -165,6 +180,26 @@ func (c *Config) GetSecrets() map[string]mtglib.Secret {
 	}
 
 	return map[string]mtglib.Secret{"default": c.Secret}
+}
+
+// GetBindAddrs returns all bind addresses as strings.
+func (c *Config) GetBindAddrs() []string {
+	addrs := make([]string, len(c.BindTo))
+
+	for i, hp := range c.BindTo {
+		addrs[i] = hp.Get("")
+	}
+
+	return addrs
+}
+
+// GetFirstBindPort returns the port of the first bind address.
+func (c *Config) GetFirstBindPort() uint {
+	if len(c.BindTo) == 0 {
+		return 0
+	}
+
+	return c.BindTo[0].Port
 }
 
 func (c *Config) String() string {
