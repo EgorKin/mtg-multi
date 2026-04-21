@@ -11,6 +11,7 @@ package main
 import (
 	"github.com/dolonet/mtg-multi/internal/cli"
 	"github.com/alecthomas/kong"
+	"golang.org/x/crypto/x509roots/fallback"
 )
 
 func main() {
